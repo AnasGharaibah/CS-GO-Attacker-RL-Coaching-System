@@ -86,7 +86,7 @@ class YOLODetector:
     def detect(self):
         import mss
         import cv2
-        with mss.mss() as sct:
+        with mss.MSS() as sct:
             img = np.array(sct.grab(sct.monitors[1]))
             frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 

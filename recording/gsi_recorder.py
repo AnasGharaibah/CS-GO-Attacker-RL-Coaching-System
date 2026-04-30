@@ -16,6 +16,8 @@ _round_phase = "unknown"
 _map_name    = None
 _gsi_file    = None
 _tick_count  = 0
+_player_team = None
+_last_team_warn = None
 
 
 def _open_file(mid):
@@ -41,7 +43,7 @@ def _write(payload):
 
 @app.post("/")
 async def receive_tick(request: Request):
-    global _match_id, _round_phase, _map_name, _tick_count
+    global _match_id, _round_phase, _map_name, _tick_count, _player_team, _last_team_warn
 
     try:
         payload = await request.json()
@@ -73,13 +75,24 @@ async def receive_tick(request: Request):
         _match_id = None
 
     if _match_id and map_phase == "live":
+        player = payload.get("player", {})
+        state  = player.get("state", {})
+        team   = player.get("team", "")
+
+        if team and team != _player_team:
+            _player_team = team
+            if team == "CT":
+                print(f"[gsi] WARNING: you are CT — this data will be ignored by the model.")
+                print(f"[gsi]          Switch to T side for useful training data.")
+            elif team == "T":
+                print(f"[gsi] You are T (attacker) — recording useful data.")
+
         _write(payload)
         _tick_count += 1
         if _tick_count % 300 == 0:
-            player = payload.get("player", {})
-            state  = player.get("state", {})
+            side = "T  ✓" if team == "T" else "CT  ← not useful"
             print(f"[gsi] Rd {map_data.get('round', '?'):>2} | "
-                  f"{player.get('team', '?')} | "
+                  f"{side} | "
                   f"HP {state.get('health', '?'):>3} | "
                   f"{round_phase} | ticks={_tick_count}")
 
@@ -104,6 +117,7 @@ async def get_status():
         "round_phase": _round_phase,
         "ticks_saved": _tick_count,
         "recording":   _match_id is not None,
+        "team":        _player_team,
     }
 
 

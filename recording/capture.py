@@ -72,11 +72,19 @@ def get_round_phase():
         return "live"
 
 
+def get_player_team():
+    try:
+        r = requests.get(f"{GSI_URL}/status", timeout=0.5)
+        return r.json().get("team", "") if r.ok else ""
+    except Exception:
+        return ""
+
+
 def main(model_path, fps, conf, monitor_idx):
     import mss
 
     model    = load_yolo(model_path)
-    sct      = mss.mss()
+    sct      = mss.MSS()
     monitor  = sct.monitors[monitor_idx] if monitor_idx < len(sct.monitors) else sct.monitors[0]
 
     print(f"[capture] {monitor['width']}x{monitor['height']} | waiting for match...")
@@ -113,6 +121,11 @@ def main(model_path, fps, conf, monitor_idx):
 
             if get_round_phase() == "freezetime":
                 time.sleep(0.1)
+                continue
+
+            team = get_player_team()
+            if team == "CT":
+                time.sleep(0.5)
                 continue
 
             frame = capture_frame(sct, monitor)
