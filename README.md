@@ -194,6 +194,34 @@ python inference.py --model rl/models/attacker_ppo_final \
                     --yolo cs2_yolo_model/weights/best.pt
 ```
 
+On Windows: double-click `inference.bat`.
+
+**What you'll see in the terminal:**
+
+```
+[inference] YOLO loaded: cs2_yolo_model\weights\best.pt
+[inference] Loading model...
+[inference] Ready. Ctrl+C to stop.
+
+  Step  Action              Conf   Enemies    GSI
+  ────────────────────────────────────────────────
+       0  MOVE FORWARD         72%        2      OK
+       1  ENGAGE ENEMY         88%        2      OK
+       2  RUSH SITE            61%        0      OK
+```
+
+| Column | Meaning |
+|---|---|
+| `Step` | Frame counter since start |
+| `Action` | What the model recommends doing right now |
+| `Conf` | Model confidence in that action |
+| `Enemies` | Enemies detected on screen by YOLO |
+| `GSI` | `OK` = CS2 is connected · `--` = no connection |
+
+A small HUD overlay also appears on screen showing the action in large text. Colors indicate action type: **cyan** = movement, **yellow** = tactical, **red** = aggressive, **green** = bomb plant. Double-click the overlay to close it.
+
+If `GSI` shows `--`, CS2 is not sending game data — check the GSI config and Steam launch option from step 2.
+
 ---
 
 ## File reference
