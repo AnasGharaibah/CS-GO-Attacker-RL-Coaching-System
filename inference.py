@@ -4,10 +4,8 @@ import time
 import threading
 import queue
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
-import requests
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -15,7 +13,7 @@ from rl.observation import encode_state
 from rl.actions import Action, get_action_mask
 
 YOLO_MODEL_PATH = "yolo_model/best.pt"
-GSI_URL         = "http://localhost:3000"
+GSI_PORT        = 3000
 DEFAULT_MODEL   = "rl/models/attacker_ppo_final"
 CONF_THRESHOLD  = 0.35
 TARGET_FPS      = 10
@@ -48,23 +46,52 @@ _WEAPON_MAP = {
 }
 
 
-class GSIReader:
-    def __init__(self, url=GSI_URL):
-        self.url    = url
-        self._cache = {}
-        self._last  = 0.0
+class GSIServer:
+    """Minimal GSI receiver that runs inside inference.py — no separate server needed."""
+
+    def __init__(self, port=GSI_PORT):
+        self._port   = port
+        self._player = {}
+        self._map    = {}
+        self._bomb   = {}
+        self._last   = 0.0
+        self._lock   = threading.Lock()
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def _serve(self):
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        import json as _json
+
+        outer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass  # silence request logs
+
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length", 0))
+                body   = self.rfile.read(length)
+                try:
+                    payload = _json.loads(body)
+                    with outer._lock:
+                        outer._player = payload.get("player", {})
+                        outer._map    = payload.get("map",    {})
+                        outer._bomb   = payload.get("bomb",   {})
+                        outer._last   = time.time()
+                except Exception:
+                    pass
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"status":"ok"}')
+
+        try:
+            HTTPServer(("0.0.0.0", self._port), Handler).serve_forever()
+        except OSError as e:
+            print(f"[gsi] Could not bind port {self._port}: {e}")
 
     def fetch(self):
-        try:
-            rp = requests.get(f"{self.url}/player", timeout=0.15)
-            rm = requests.get(f"{self.url}/map",    timeout=0.15)
-            rb = requests.get(f"{self.url}/bomb",   timeout=0.15)
-            if rp.ok and rm.ok and rb.ok:
-                self._cache = {"player": rp.json(), "map": rm.json(), "bomb": rb.json()}
-                self._last  = time.time()
-        except Exception:
-            pass
-        return self._cache
+        with self._lock:
+            return {"player": self._player, "map": self._map, "bomb": self._bomb}
 
     @property
     def connected(self):
@@ -273,8 +300,9 @@ class InferenceEngine:
         from sb3_contrib import MaskablePPO
         print("[inference] Loading model...")
         self.model    = MaskablePPO.load(model_path)
-        self.gsi      = GSIReader()
+        self.gsi      = GSIServer()
         self.detector = YOLODetector(yolo_path)
+        print(f"[inference] GSI listening on port {GSI_PORT} — make sure CS2 GSI config points here")
         self.hz       = hz
         self.frame_id = 0
         self.hud      = None
@@ -298,7 +326,7 @@ class InferenceEngine:
 
     def step(self):
         t0      = time.perf_counter()
-        gsi     = self.gsi.fetch()
+        gsi     = self.gsi.fetch()  # reads from in-process GSI server cache
         dets    = self.detector.detect()
         state   = build_state(gsi, dets, self.frame_id)
         obs     = encode_state(state).reshape(1, -1)
