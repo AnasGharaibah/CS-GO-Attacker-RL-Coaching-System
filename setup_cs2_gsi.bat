@@ -50,7 +50,7 @@ echo     "uri" "http://127.0.0.1:3000/"
 echo     "timeout" "5.0"
 echo     "buffer"  "0.1"
 echo     "throttle" "0.1"
-echo     "heartbeat" "60.0"
+echo     "heartbeat" "5.0"
 echo     "data"
 echo     {
 echo         "map"            "1"

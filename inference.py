@@ -95,7 +95,7 @@ class GSIServer:
 
     @property
     def connected(self):
-        return (time.time() - self._last) < 3.0
+        return (time.time() - self._last) < 10.0
 
 
 class YOLODetector:
