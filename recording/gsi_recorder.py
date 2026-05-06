@@ -18,6 +18,9 @@ _gsi_file    = None
 _tick_count  = 0
 _player_team = None
 _last_team_warn = None
+_last_player = {}
+_last_map    = {}
+_last_bomb   = {}
 
 
 def _open_file(mid):
@@ -44,6 +47,7 @@ def _write(payload):
 @app.post("/")
 async def receive_tick(request: Request):
     global _match_id, _round_phase, _map_name, _tick_count, _player_team, _last_team_warn
+    global _last_player, _last_map, _last_bomb
 
     try:
         payload = await request.json()
@@ -61,6 +65,9 @@ async def receive_tick(request: Request):
 
     _round_phase = round_phase
     _map_name    = map_name
+    _last_player = payload.get("player", {})
+    _last_map    = payload.get("map",    {})
+    _last_bomb   = payload.get("bomb",   {})
 
     if map_phase == "live" and _match_id is None:
         ts        = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -97,6 +104,21 @@ async def receive_tick(request: Request):
                   f"{round_phase} | ticks={_tick_count}")
 
     return {"status": "ok"}
+
+
+@app.get("/player")
+async def get_player():
+    return _last_player
+
+
+@app.get("/map")
+async def get_map():
+    return _last_map
+
+
+@app.get("/bomb")
+async def get_bomb():
+    return _last_bomb
 
 
 @app.get("/match_id")

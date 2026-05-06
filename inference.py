@@ -56,12 +56,11 @@ class GSIReader:
 
     def fetch(self):
         try:
-            r = requests.get(f"{self.url}/player", timeout=0.15)
-            if r.ok:
-                player = r.json()
-                gmap   = requests.get(f"{self.url}/map",  timeout=0.15).json()
-                bomb   = requests.get(f"{self.url}/bomb", timeout=0.15).json()
-                self._cache = {"player": player, "map": gmap, "bomb": bomb}
+            rp = requests.get(f"{self.url}/player", timeout=0.15)
+            rm = requests.get(f"{self.url}/map",    timeout=0.15)
+            rb = requests.get(f"{self.url}/bomb",   timeout=0.15)
+            if rp.ok and rm.ok and rb.ok:
+                self._cache = {"player": rp.json(), "map": rm.json(), "bomb": rb.json()}
                 self._last  = time.time()
         except Exception:
             pass
